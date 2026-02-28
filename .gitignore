@@ -1,0 +1,14 @@
+# Runtime data - never commit database or metric storage
+data/
+
+# Secrets
+.env
+
+# OS artifacts
+.DS_Store
+*.swp
+*~
+
+# Editor directories
+.vscode/
+.idea/

@@ -1,0 +1,47 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# targets.yml  —  EDIT THIS FILE to define what NetworkMonitor watches.
+# Prometheus watches this file and reloads it automatically on changes.
+# No need to restart any containers after editing.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── ICMP Ping targets ───────────────────────────────────────────────────────
+# Tests round-trip latency and packet loss to these hosts.
+- targets:
+    - 8.8.8.8          # Google DNS
+    - 1.1.1.1          # Cloudflare DNS
+    - 9.9.9.9          # Quad9 DNS
+    - 192.168.1.1      # Local router/gateway
+    - google.com       # Public internet reachability
+  labels:
+    job: icmp_ping
+
+# ── DNS resolution targets ───────────────────────────────────────────────────
+# Probes DNS query time (A-record lookup for a fixed hostname).
+- targets:
+    - 8.8.8.8          # Google public DNS resolver
+    - 1.1.1.1          # Cloudflare resolver
+    - 192.168.1.1      # Local DNS (your router or Pi-hole)
+  labels:
+    job: dns_probe
+
+# ── HTTP/HTTPS endpoint targets ──────────────────────────────────────────────
+# Checks that these URLs return an HTTP 2xx response.
+- targets:
+    - https://google.com
+    - https://github.com
+    - https://cloudflare.com
+    # Internal services — uncomment and edit as needed:
+    # - http://192.168.1.10:8080   # TrueNAS web UI
+    # - http://192.168.1.20:1880   # Node-RED
+  labels:
+    job: http_probe
+
+# ── TCP port targets ─────────────────────────────────────────────────────────
+# Checks that a TCP connection can be established to host:port.
+- targets:
+    - 8.8.8.8:53       # Google DNS TCP
+    - 1.1.1.1:53       # Cloudflare DNS TCP
+    # - 192.168.1.5:22    # SSH on a LAN host
+    # - 192.168.1.10:443  # HTTPS on TrueNAS
+  labels:
+    job: tcp_probe

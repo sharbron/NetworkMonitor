@@ -1,0 +1,126 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    monitor: 'network-monitor'
+    site: 'home'                # Change to identify your location
+
+# ── Alertmanager integration ──────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# ── Alert rule files ──────────────────────────────────────────────────────
+rule_files:
+  - /etc/prometheus/rules/blackbox_alerts.yml
+  - /etc/prometheus/rules/node_alerts.yml
+
+# ── Scrape configurations ─────────────────────────────────────────────────
+scrape_configs:
+
+  # Self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'blackbox_exporter'
+    static_configs:
+      - targets: ['blackbox:9115']
+
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  # ── ICMP Ping (latency + reachability) ────────────────────────────────
+  - job_name: 'blackbox_icmp'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    scrape_interval: 15s
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+      - source_labels: [job]
+        regex: icmp_ping
+        action: keep
+
+  # ── DNS probe ──────────────────────────────────────────────────────────
+  - job_name: 'blackbox_dns'
+    metrics_path: /probe
+    params:
+      module: [dns_udp]
+    scrape_interval: 30s
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+      - source_labels: [job]
+        regex: dns_probe
+        action: keep
+
+  # ── HTTP/HTTPS probe ───────────────────────────────────────────────────
+  - job_name: 'blackbox_http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 60s          # Less frequent to avoid rate-limiting public sites
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+      - source_labels: [job]
+        regex: http_probe
+        action: keep
+
+  # ── TCP port probe ─────────────────────────────────────────────────────
+  - job_name: 'blackbox_tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    scrape_interval: 30s
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+      - source_labels: [job]
+        regex: tcp_probe
+        action: keep
+
+  # ── Node Exporter (host system + network interfaces) ───────────────────
+  # node_exporter uses network_mode:host, so it's reachable at host IP
+  - job_name: 'node_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:9100']

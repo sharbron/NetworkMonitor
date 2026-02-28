@@ -1,0 +1,6 @@
+{
+  "_PLACEHOLDER": true,
+  "_note": "Download the real dashboard before starting the stack.",
+  "_command": "curl -fsSL 'https://grafana.com/api/dashboards/1860/revisions/latest/download' -o grafana/dashboards/node-exporter-full.json",
+  "_dashboard_url": "https://grafana.com/grafana/dashboards/1860"
+}

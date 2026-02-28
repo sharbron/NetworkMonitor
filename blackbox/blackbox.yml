@@ -1,0 +1,55 @@
+modules:
+
+  # ── ICMP Ping ─────────────────────────────────────────────────────────
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4   # Docker blocks IPv6 by default
+      ip_protocol_fallback: true
+
+  # ── HTTP 2xx ──────────────────────────────────────────────────────────
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []          # Empty = accept any 2xx
+      preferred_ip_protocol: ip4
+      follow_redirects: true
+      tls_config:
+        insecure_skip_verify: false
+
+  # ── HTTP 2xx (skip TLS verify — for self-signed certs on LAN) ─────────
+  http_2xx_insecure:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: []
+      preferred_ip_protocol: ip4
+      follow_redirects: true
+      tls_config:
+        insecure_skip_verify: true
+
+  # ── DNS UDP query ─────────────────────────────────────────────────────
+  # Tests a resolver by querying for a fixed, always-resolvable name
+  dns_udp:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: udp
+      preferred_ip_protocol: ip4
+      query_name: "cloudflare.com"
+      query_type: "A"
+      valid_rcodes:
+        - NOERROR
+
+  # ── TCP connect ───────────────────────────────────────────────────────
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: true

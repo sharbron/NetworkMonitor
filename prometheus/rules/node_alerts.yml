@@ -1,0 +1,65 @@
+groups:
+  - name: node_network_alerts
+    interval: 30s
+    rules:
+
+      # Network interface receives more than 800 Mbps
+      # Adjust threshold to match your link speed (e.g. 90e6 for 100 Mbps link)
+      - alert: HighInboundBandwidth
+        expr: |
+          rate(node_network_receive_bytes_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) * 8 > 800e6
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High inbound traffic on {{ $labels.device }}"
+          description: |
+            Interface {{ $labels.device }} is receiving
+            {{ $value | humanize }}bps (threshold: 800 Mbps).
+
+      # Network interface transmits more than 800 Mbps
+      - alert: HighOutboundBandwidth
+        expr: |
+          rate(node_network_transmit_bytes_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) * 8 > 800e6
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High outbound traffic on {{ $labels.device }}"
+          description: |
+            Interface {{ $labels.device }} is transmitting
+            {{ $value | humanize }}bps (threshold: 800 Mbps).
+
+      # Network interface went down
+      - alert: NetworkInterfaceDown
+        expr: |
+          node_network_up{device!~"lo|veth.*|docker.*|br-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Network interface down: {{ $labels.device }}"
+          description: |
+            Interface {{ $labels.device }} has been down for more than 1 minute.
+
+      # Elevated packet error rate
+      - alert: HighPacketErrors
+        expr: |
+          rate(node_network_receive_errs_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Packet errors on {{ $labels.device }}"
+          description: |
+            Interface {{ $labels.device }} has {{ $value | humanize }} receive errors/sec.
+
+      # Node Exporter itself unreachable
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter is unreachable"
+          description: "Prometheus cannot scrape node_exporter. Host metrics unavailable."

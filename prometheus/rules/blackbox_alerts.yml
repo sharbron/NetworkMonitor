@@ -1,0 +1,94 @@
+groups:
+  - name: blackbox_probe_alerts
+    interval: 30s
+    rules:
+
+      # Target completely unreachable
+      - alert: ProbeFailed
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Probe failed: {{ $labels.instance }}"
+          description: |
+            The {{ $labels.job }} probe to {{ $labels.instance }} has been
+            failing for more than 2 minutes.
+
+      # Slow ICMP round-trip (>200ms average over 5 minutes)
+      - alert: HighPingLatency
+        expr: |
+          avg_over_time(probe_duration_seconds{job="blackbox_icmp"}[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High ping latency to {{ $labels.instance }}"
+          description: |
+            Average round-trip time to {{ $labels.instance }} is
+            {{ $value | humanizeDuration }} (threshold: 200ms).
+
+      # Slow HTTP response (>2 seconds average over 5 minutes)
+      - alert: SlowHTTPResponse
+        expr: |
+          avg_over_time(probe_duration_seconds{job="blackbox_http"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow HTTP response from {{ $labels.instance }}"
+          description: |
+            Average HTTP response time from {{ $labels.instance }} is
+            {{ $value | humanizeDuration }} (threshold: 2s).
+
+      # HTTP returned non-2xx status code
+      - alert: HTTPBadStatusCode
+        expr: |
+          probe_http_status_code{job="blackbox_http"} <= 199
+          OR
+          probe_http_status_code{job="blackbox_http"} >= 400
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bad HTTP status from {{ $labels.instance }}"
+          description: |
+            HTTP probe to {{ $labels.instance }} returned status
+            {{ $value }} (expected 200-399).
+
+      # SSL certificate expiring within 30 days
+      - alert: SSLCertExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL cert expiring soon for {{ $labels.instance }}"
+          description: |
+            SSL certificate for {{ $labels.instance }} expires in
+            {{ $value | printf "%.0f" }} days.
+
+      # SSL certificate already expired
+      - alert: SSLCertExpired
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SSL certificate EXPIRED for {{ $labels.instance }}"
+          description: |
+            The SSL certificate for {{ $labels.instance }} has expired.
+
+      # DNS probe slow (>500ms)
+      - alert: SlowDNSResolution
+        expr: |
+          avg_over_time(probe_duration_seconds{job="blackbox_dns"}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow DNS resolver: {{ $labels.instance }}"
+          description: |
+            DNS lookups via {{ $labels.instance }} averaging
+            {{ $value | humanizeDuration }} (threshold: 500ms).

@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: "NetworkMonitor"
+    orgId: 1
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false       # Changes made in UI won't persist — edit the JSON files
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

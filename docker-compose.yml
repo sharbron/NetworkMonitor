@@ -1,0 +1,136 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# NetworkMonitor — docker-compose.yml
+# Compatible with: Linux x86-64 and ARM64 (Firewalla, TrueNAS Scale, RPi)
+# ═══════════════════════════════════════════════════════════════════════════
+name: networkmonitor
+
+services:
+
+  # ── Prometheus ──────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: prometheus
+    restart: unless-stopped
+    user: "65534:65534"          # nobody:nobody (matches prom image default)
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+      - '--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-5GB}'
+      - '--storage.tsdb.wal-compression'
+      - '--web.enable-lifecycle'           # enables POST /-/reload
+      - '--web.enable-admin-api'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./targets.yml:/etc/prometheus/targets.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitor_net
+    depends_on:
+      - blackbox
+      - node_exporter
+
+  # ── Blackbox Exporter ───────────────────────────────────────────────────
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox
+    restart: unless-stopped
+    command:
+      - '--config.file=/config/blackbox.yml'
+    cap_add:
+      - NET_RAW              # Required for ICMP ping probes (no privileged needed)
+    ports:
+      - "${BLACKBOX_PORT:-9115}:9115"
+    volumes:
+      - ./blackbox/blackbox.yml:/config/blackbox.yml:ro
+    networks:
+      - monitor_net
+
+  # ── Node Exporter ───────────────────────────────────────────────────────
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:v1.8.2
+    container_name: node_exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.netdev'
+      - '--collector.netstat'
+      - '--collector.meminfo'
+      - '--collector.diskstats'
+    # network_mode: host is required to expose real host interface metrics.
+    # Without it, node_exporter only sees its own container's veth interface.
+    network_mode: host
+    pid: host
+    volumes:
+      - '/:/host:ro,rslave'
+
+  # ── Alertmanager ────────────────────────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    env_file: .env
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - monitor_net
+
+  # ── Grafana ─────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ALERTING_ENABLED=false
+      - GF_UNIFIED_ALERTING_ENABLED=false
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitor_net
+    depends_on:
+      - prometheus
+
+# ── Named Volumes ──────────────────────────────────────────────────────────
+volumes:
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/prometheus
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/grafana
+  alertmanager_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/alertmanager
+
+# ── Network ────────────────────────────────────────────────────────────────
+networks:
+  monitor_net:
+    driver: bridge
