@@ -6,7 +6,7 @@ name: networkmonitor
 
 services:
 
-  # ── Prometheus ──────────────────────────────────────────────────────────
+  # ── Prometheus ──────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v3.1.0
     container_name: prometheus
@@ -30,10 +30,18 @@ services:
     networks:
       - monitor_net
     depends_on:
-      - blackbox
-      - node_exporter
+      blackbox:
+        condition: service_healthy
+      node_exporter:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
-  # ── Blackbox Exporter ───────────────────────────────────────────────────
+  # ── Blackbox Exporter ───────────────────────────────────────────────────────
   blackbox:
     image: prom/blackbox-exporter:v0.25.0
     container_name: blackbox
@@ -48,8 +56,14 @@ services:
       - ./blackbox/blackbox.yml:/config/blackbox.yml:ro
     networks:
       - monitor_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9115/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-  # ── Node Exporter ───────────────────────────────────────────────────────
+  # ── Node Exporter ───────────────────────────────────────────────────────────
   node_exporter:
     image: quay.io/prometheus/node-exporter:v1.8.2
     container_name: node_exporter
@@ -67,8 +81,14 @@ services:
     pid: host
     volumes:
       - '/:/host:ro,rslave'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9100/metrics"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-  # ── Alertmanager ────────────────────────────────────────────────────────
+  # ── Alertmanager ────────────────────────────────────────────────────────────
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: alertmanager
@@ -84,8 +104,14 @@ services:
       - alertmanager_data:/alertmanager
     networks:
       - monitor_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-  # ── Grafana ─────────────────────────────────────────────────────────────
+  # ── Grafana ─────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:11.4.0
     container_name: grafana
@@ -107,9 +133,16 @@ services:
     networks:
       - monitor_net
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
-# ── Named Volumes ──────────────────────────────────────────────────────────
+# ── Named Volumes ──────────────────────────────────────────────────────────────
 volumes:
   prometheus_data:
     driver: local
@@ -130,7 +163,7 @@ volumes:
       o: bind
       device: ./data/alertmanager
 
-# ── Network ────────────────────────────────────────────────────────────────
+# ── Network ────────────────────────────────────────────────────────────────────
 networks:
   monitor_net:
     driver: bridge
