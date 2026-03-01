@@ -4,21 +4,21 @@ global:
   scrape_timeout: 10s
   external_labels:
     monitor: 'network-monitor'
-    site: 'home'                # Change to identify your location
+    site: '${PROMETHEUS_SITE:-home}'        # Set PROMETHEUS_SITE in .env
 
-# ── Alertmanager integration ──────────────────────────────────────────────
+# ── Alertmanager integration ──────────────────────────────────────────────────
 alerting:
   alertmanagers:
     - static_configs:
         - targets:
             - alertmanager:9093
 
-# ── Alert rule files ──────────────────────────────────────────────────────
+# ── Alert rule files ──────────────────────────────────────────────────────────
 rule_files:
   - /etc/prometheus/rules/blackbox_alerts.yml
   - /etc/prometheus/rules/node_alerts.yml
 
-# ── Scrape configurations ─────────────────────────────────────────────────
+# ── Scrape configurations ─────────────────────────────────────────────────────
 scrape_configs:
 
   # Self-monitoring
@@ -34,7 +34,25 @@ scrape_configs:
     static_configs:
       - targets: ['alertmanager:9093']
 
-  # ── ICMP Ping (latency + reachability) ────────────────────────────────
+  # ── Internal service health (Grafana) ──────────────────────────────────────
+  # Reuses the existing ProbeFailed alert — fires if Grafana stops responding.
+  - job_name: 'blackbox_internal'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - http://grafana:3000/api/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  # ── ICMP Ping (latency + reachability) ────────────────────────────────────
   - job_name: 'blackbox_icmp'
     metrics_path: /probe
     params:
@@ -55,7 +73,7 @@ scrape_configs:
         regex: icmp_ping
         action: keep
 
-  # ── DNS probe ──────────────────────────────────────────────────────────
+  # ── DNS probe ──────────────────────────────────────────────────────────────
   - job_name: 'blackbox_dns'
     metrics_path: /probe
     params:
@@ -76,7 +94,7 @@ scrape_configs:
         regex: dns_probe
         action: keep
 
-  # ── HTTP/HTTPS probe ───────────────────────────────────────────────────
+  # ── HTTP/HTTPS probe ───────────────────────────────────────────────────────
   - job_name: 'blackbox_http'
     metrics_path: /probe
     params:
@@ -97,7 +115,7 @@ scrape_configs:
         regex: http_probe
         action: keep
 
-  # ── TCP port probe ─────────────────────────────────────────────────────
+  # ── TCP port probe ─────────────────────────────────────────────────────────
   - job_name: 'blackbox_tcp'
     metrics_path: /probe
     params:
@@ -118,7 +136,7 @@ scrape_configs:
         regex: tcp_probe
         action: keep
 
-  # ── Node Exporter (host system + network interfaces) ───────────────────
+  # ── Node Exporter (host system + network interfaces) ───────────────────────
   # node_exporter uses network_mode:host, so it's reachable at host IP
   - job_name: 'node_exporter'
     scrape_interval: 15s

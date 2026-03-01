@@ -25,27 +25,21 @@ A self-contained network monitoring stack for home and SOHO networks, built on P
 git clone https://github.com/sharbron/NetworkMonitor.git
 cd NetworkMonitor
 
-# 2. Download the community Grafana dashboards
-curl -fsSL 'https://grafana.com/api/dashboards/1860/revisions/latest/download' \
-  -o grafana/dashboards/node-exporter-full.json
-
-curl -fsSL 'https://grafana.com/api/dashboards/7587/revisions/latest/download' \
-  -o grafana/dashboards/blackbox-exporter.json
-
-# 3. Configure secrets
+# 2. Configure secrets and settings
 cp .env.example .env
-$EDITOR .env          # set GF_SECURITY_ADMIN_PASSWORD at minimum
+$EDITOR .env          # set GF_SECURITY_ADMIN_PASSWORD, PROMETHEUS_SITE, and alert credentials
 
-# 4. Add your targets
+# 3. Add your targets
 $EDITOR targets.yml   # add your hosts/IPs/URLs
 
-# 5. Create data directories with correct permissions
-mkdir -p data/{prometheus,grafana,alertmanager}
-chown -R 65534:65534 data/prometheus   # Prometheus runs as nobody (UID 65534)
+# 4. Run setup (downloads dashboards, creates data dirs, generates config)
+chmod +x setup.sh && ./setup.sh
 
-# 6. Start the stack
+# 5. Start the stack
 docker compose up -d
 ```
+
+> **Re-run `./setup.sh` after editing `.env`** to regenerate config files with your updated values.
 
 Open Grafana at **http://localhost:3000** (or your host IP).
 
@@ -126,14 +120,16 @@ If you don't want external notifications, leave those fields as-is — alerts st
 - `SSLCertExpired` — cert already expired (critical)
 - `SlowDNSResolution` — average DNS query >500ms over 5 min (warning)
 
-**Host alerts** (`prometheus/rules/node_alerts.yml`):
-- `HighInboundBandwidth` — interface receiving >800 Mbps for 5 min (warning)
-- `HighOutboundBandwidth` — interface sending >800 Mbps for 5 min (warning)
+**Host alerts** (`prometheus/rules/node_alerts.yml.template`):
+- `HighInboundBandwidth` — interface receiving >`BANDWIDTH_THRESHOLD_MBPS` Mbps for 5 min (warning)
+- `HighOutboundBandwidth` — interface sending >`BANDWIDTH_THRESHOLD_MBPS` Mbps for 5 min (warning)
 - `NetworkInterfaceDown` — interface down for 1+ minute (critical)
 - `HighPacketErrors` — receive errors >10/sec for 5 min (warning)
 - `NodeExporterDown` — node_exporter unreachable for 1 min (critical)
 
-Adjust the bandwidth threshold (default `800e6` = 800 Mbps) in `prometheus/rules/node_alerts.yml` to match your link speed.
+Set `BANDWIDTH_THRESHOLD_MBPS` in `.env` to match your link speed (default: `800`). Re-run `./setup.sh` to apply.
+
+> **Grafana monitoring:** The `ProbeFailed` alert also covers Grafana itself — Prometheus probes `http://grafana:3000/api/health` every 30 seconds and fires if it's unreachable for 2+ minutes.
 
 ## Grafana dashboards
 
@@ -144,7 +140,7 @@ Two community dashboards load automatically via Grafana provisioning:
 | Node Exporter Full | [1860](https://grafana.com/grafana/dashboards/1860) | CPU, memory, disk, per-interface bandwidth |
 | Prometheus Blackbox Exporter | [7587](https://grafana.com/grafana/dashboards/7587) | Probe status, HTTP codes, SSL expiry, response times |
 
-> **Note:** The JSON files in `grafana/dashboards/` are placeholders. Run the `curl` commands in the Quick Start section to download the real dashboards before starting the stack.
+> **Note:** The JSON files in `grafana/dashboards/` are placeholders. `setup.sh` downloads the real dashboards automatically.
 
 ## Useful management commands
 
@@ -203,14 +199,15 @@ targets.yml ──► Prometheus ──► Blackbox Exporter
 
 ```
 NetworkMonitor/
+├── setup.sh                            # ← Run this first (downloads dashboards, generates config)
 ├── docker-compose.yml                  # Service definitions
 ├── targets.yml                         # ← Edit this to add hosts
 ├── .env.example                        # Copy to .env and fill in secrets
 ├── prometheus/
-│   ├── prometheus.yml                  # Scrape configuration
+│   ├── prometheus.yml.template         # Scrape config template (generates prometheus.yml)
 │   └── rules/
 │       ├── blackbox_alerts.yml         # Probe alert rules
-│       └── node_alerts.yml             # Host network alert rules
+│       └── node_alerts.yml.template    # Host network alert rules template (generates node_alerts.yml)
 ├── blackbox/
 │   └── blackbox.yml                    # Probe module definitions
 ├── alertmanager/
@@ -220,5 +217,5 @@ NetworkMonitor/
     ├── provisioning/
     │   ├── datasources/prometheus.yml  # Auto-wires Prometheus
     │   └── dashboards/dashboards.yml   # Points Grafana at dashboard JSONs
-    └── dashboards/                     # Drop dashboard JSON files here
+    └── dashboards/                     # Dashboard JSONs downloaded by setup.sh
 ```

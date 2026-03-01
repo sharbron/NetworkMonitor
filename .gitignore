@@ -4,6 +4,14 @@ data/
 # Secrets
 .env
 
+# Generated config files (produced by setup.sh from *.template sources)
+prometheus/prometheus.yml
+prometheus/rules/node_alerts.yml
+
+# Downloaded Grafana dashboards (fetched by setup.sh)
+grafana/dashboards/node-exporter-full.json
+grafana/dashboards/blackbox-exporter.json
+
 # OS artifacts
 .DS_Store
 *.swp

@@ -3,11 +3,11 @@ groups:
     interval: 30s
     rules:
 
-      # Network interface receives more than 800 Mbps
-      # Adjust threshold to match your link speed (e.g. 90e6 for 100 Mbps link)
+      # Network interface receives more than BANDWIDTH_THRESHOLD_MBPS Mbps
+      # Set BANDWIDTH_THRESHOLD_MBPS in .env to match your link speed (e.g. 100 for 100 Mbps)
       - alert: HighInboundBandwidth
         expr: |
-          rate(node_network_receive_bytes_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) * 8 > 800e6
+          rate(node_network_receive_bytes_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) * 8 > ${BANDWIDTH_THRESHOLD_MBPS:-800}e6
         for: 5m
         labels:
           severity: warning
@@ -15,12 +15,12 @@ groups:
           summary: "High inbound traffic on {{ $labels.device }}"
           description: |
             Interface {{ $labels.device }} is receiving
-            {{ $value | humanize }}bps (threshold: 800 Mbps).
+            {{ $value | humanize }}bps (threshold: ${BANDWIDTH_THRESHOLD_MBPS:-800} Mbps).
 
-      # Network interface transmits more than 800 Mbps
+      # Network interface transmits more than BANDWIDTH_THRESHOLD_MBPS Mbps
       - alert: HighOutboundBandwidth
         expr: |
-          rate(node_network_transmit_bytes_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) * 8 > 800e6
+          rate(node_network_transmit_bytes_total{device!~"lo|veth.*|docker.*|br-.*"}[5m]) * 8 > ${BANDWIDTH_THRESHOLD_MBPS:-800}e6
         for: 5m
         labels:
           severity: warning
@@ -28,7 +28,7 @@ groups:
           summary: "High outbound traffic on {{ $labels.device }}"
           description: |
             Interface {{ $labels.device }} is transmitting
-            {{ $value | humanize }}bps (threshold: 800 Mbps).
+            {{ $value | humanize }}bps (threshold: ${BANDWIDTH_THRESHOLD_MBPS:-800} Mbps).
 
       # Network interface went down
       - alert: NetworkInterfaceDown
