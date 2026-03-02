@@ -164,7 +164,9 @@ rm -rf data/
 
 ### Firewalla
 
-- Firewalla runs custom Linux on ARM64 — all images have ARM64 support.
+- **Gold Pro** (and other x86 models) run custom Linux on x86-64 architecture.
+- **Red/Blue/Purple** models run on ARM64 architecture.
+- All image versions in this stack support both architectures.
 - Port 3000 is usually free. If Firewalla's UI uses it, set `GRAFANA_PORT=3001` in `.env`.
 - If ICMP probes fail, add to the `blackbox` service in `docker-compose.yml`:
   ```yaml
